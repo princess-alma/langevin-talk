@@ -158,7 +158,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # Load the trained model
-    model_path = "trained_ebm_replay.pth"
+    model_path = "trained_ebm.pth"
     model, training_info = load_trained_ebm(model_path, device=device)
 
     # Initialize Langevin sampler
