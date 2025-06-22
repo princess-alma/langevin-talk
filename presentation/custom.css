@@ -1,0 +1,26 @@
+/* Top-left alignment for all other slides */
+.reveal .slides section:not(.cover-slide) {
+    display: block;
+    text-align: left;
+    padding: 20px; /* Optional: Add padding for better spacing */
+    margin: 0; /* Reset margin */
+    box-sizing: border-box; /* Ensure padding and border are included in width/height */
+    height: 100%; /* Full viewport height */
+    width: 100%; /* Full viewport width */
+  }
+
+  .reveal .slide-number {
+    bottom: 20px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+    color: #666;
+    font-size: 0.5em;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 4px 8px;
+    border-radius: 4px;
+    user-select: none;
+    position: fixed; /* Ensure it stays fixed at bottom center */
+    z-index: 1000;
+  }
+  
