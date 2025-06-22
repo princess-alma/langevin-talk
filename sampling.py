@@ -112,6 +112,79 @@ class LangevinSampler:
         """
         return self.sample_with_trajectory(positive_samples, save_steps=save_steps, maximize_energy=True)
 
+def visualize_batch_sampling(model, num_samples=36, num_steps=100, step_size=0.1, noise_scale=0.01, device='cpu', title="Batch Sampling Results"):
+    """
+    Visualize the final results of batch sampling by evolving 36 random samples.
+    Shows only the final generated samples in a 6x6 grid.
+    Args:
+        model: The trained energy-based model.
+        num_samples: Number of samples to generate (default 36 for 6x6 grid).
+        num_steps: Number of Langevin steps to perform.
+        step_size: Step size for gradient updates.
+        noise_scale: Scale of Gaussian noise added at each step.
+        device: Device to run the sampling on.
+        title: Title for the plot.
+    """
+    import matplotlib.pyplot as plt
+    
+    # Initialize Langevin sampler for generation (minimizing energy)
+    sampler = LangevinSampler(
+        model=model,
+        step_size=step_size,
+        noise_scale=noise_scale,
+        num_steps=num_steps,
+        device=device,
+        maximize_energy=False  # Minimize energy to generate samples
+    )
+    
+    # Start with random noise
+    initial_samples = torch.rand(num_samples, 1, 28, 28).to(device)
+    
+    print(f"Starting batch sampling with {num_samples} samples for {num_steps} steps...")
+    
+    # Perform Langevin sampling (only need final results)
+    final_samples = sampler.sample(initial_samples)
+    
+    # Convert to numpy for visualization
+    final_images = final_samples.cpu().squeeze(1).numpy()
+    
+    # Get energy values for the final samples
+    with torch.no_grad():
+        model.eval()
+        final_energies = model(final_samples).cpu().numpy().flatten()
+    
+    # Create 6x6 grid visualization showing only final results
+    fig, axes = plt.subplots(6, 6, figsize=(10, 10))
+    fig.suptitle(f'{title}\n{num_steps} Langevin Steps (Step Size: {step_size}, Noise: {noise_scale})', fontsize=16)
+    
+    for i in range(6):
+        for j in range(6):
+            idx = i * 6 + j
+            
+            if idx < len(final_images):
+                # Show final generated sample
+                axes[i, j].imshow(final_images[idx], cmap='gray')
+                axes[i, j].set_title(f'E: {final_energies[idx]:.2f}', fontsize=10)
+                axes[i, j].axis('off')
+            else:
+                axes[i, j].axis('off')
+    
+    # Add energy statistics at the bottom
+    avg_final_energy = np.mean(final_energies)
+    min_energy = np.min(final_energies)
+    max_energy = np.max(final_energies)
+    
+    plt.figtext(0.5, 0.02, f'Energy Stats - Avg: {avg_final_energy:.2f}, Min: {min_energy:.2f}, Max: {max_energy:.2f}', 
+                ha='center', fontsize=12)
+    
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.08)  # Make room for energy stats
+    plt.show()
+    
+    print(f"Batch sampling completed!")
+    print(f"Average final energy: {avg_final_energy:.4f}")
+    print(f"Energy range: [{min_energy:.2f}, {max_energy:.2f}]")
+
 def visualize_sampling_trajectory(trajectory, sample_idx=0, title="Langevin Sampling Trajectory"):
     """
     Visualize the sampling trajectory in a 6x6 grid.
@@ -175,13 +248,16 @@ if __name__ == "__main__":
     print(f"Starting Langevin sampling with {batch_size} samples...")
 
     # Perform Langevin sampling with trajectory
-    final_samples, trajectory = sampler.sample_with_trajectory(initial_samples, save_steps=36)
+    #final_samples, trajectory = sampler.sample_with_trajectory(initial_samples, save_steps=36)
 
-    print(f"Sampling completed! Saved {len(trajectory)} steps.")
+    #print(f"Sampling completed! Saved {len(trajectory)} steps.")
     
     # Visualize trajectory for the first sample
-    visualize_sampling_trajectory(trajectory, sample_idx=0, title="Langevin Sampling: Random Noise → MNIST-like Digit")
+    #visualize_sampling_trajectory(trajectory, sample_idx=0, title="Langevin Sampling: Random Noise → MNIST-like Digit")
     
     # Also show trajectories for other samples
     #for i in range(1, min(batch_size, 3)):
     #    visualize_sampling_trajectory(trajectory, sample_idx=i, title=f"Langevin Sampling Trajectory - Sample {i+1}")
+    
+    # Visualize batch sampling results
+    visualize_batch_sampling(model, num_samples=36, num_steps=2000, step_size=0.1, noise_scale=0.01, device=device, title="Batch Sampling Results")
