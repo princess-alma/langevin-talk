@@ -1,11 +1,14 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
+from load_mnist import get_mnist_dataset_local
+
+(train_images, train_labels), (test_images, test_labels) = get_mnist_dataset_local()
 
 class LangevinSampler:
     """Langevin Dynamics Sampler for Energy-Based Models"""
 
-    def __init__(self, model, step_size=0.1, noise_scale=0.01, num_steps=100, device='cpu'):
+    def __init__(self, model, step_size=0.1, noise_scale=0.01, num_steps=100, device='cpu', maximize_energy=False):
         """
         Initialize the Langevin sampler.
         Args:
@@ -14,43 +17,42 @@ class LangevinSampler:
             noise_scale: Scale of Gaussian noise added at each step.
             num_steps: Number of Langevin steps to perform.
             device: Device to run the sampling on.
+            maximize_energy: If True, perform gradient ascent to maximize energy (for negative sample generation).
+                           If False, perform gradient descent to minimize energy (for sampling from the model).
         """
         self.model = model
         self.step_size = step_size
         self.noise_scale = noise_scale
         self.num_steps = num_steps
         self.device = device
+        self.maximize_energy = maximize_energy
 
-    def sample_with_trajectory(self, initial_samples, save_steps=36):
+    def sample_with_trajectory(self, initial_samples, save_steps=36, maximize_energy=None):
         """
         Perform Langevin sampling and save intermediate steps.
         Args:
             initial_samples: Tensor of initial samples (batch_size, channels, height, width).
             save_steps: Number of steps to save (including first and last).
+            maximize_energy: Override the instance setting for this specific call.
         Returns:
             Final samples and trajectory of saved steps.
         """
-        # Put model in train mode to enable gradients
-        self.model.train()
+        # Use override if provided, otherwise use instance setting
+        if maximize_energy is None:
+            maximize_energy = self.maximize_energy
+            
+        # --- FIX: Use model.eval() for stable BatchNorm statistics ---
+        # BatchNorm should use running statistics, not mini-batch statistics during sampling
+        self.model.eval()
         
         samples = initial_samples.clone().to(self.device)
         samples.requires_grad_(True)
         
-        # Calculate which steps to save (first, last, and evenly spaced between)
+        # Calculate which steps to save
         if save_steps <= 2:
-            save_indices = [0, self.num_steps - 1]
+            save_indices = {0, self.num_steps - 1}
         else:
-            # First and last steps
-            save_indices = [0, self.num_steps - 1]
-            # Evenly spaced steps in between
-            if save_steps > 2:
-                middle_steps = np.linspace(1, self.num_steps - 2, save_steps - 2, dtype=int)
-                save_indices = [0] + sorted(middle_steps.tolist()) + [self.num_steps - 1]
-                # Remove duplicates and sort
-                save_indices = sorted(list(set(save_indices)))
-                # Take exactly save_steps
-                if len(save_indices) > save_steps:
-                    save_indices = save_indices[:save_steps]
+            save_indices = set(np.linspace(0, self.num_steps - 1, save_steps, dtype=int))
         
         trajectory = []
         
@@ -59,39 +61,56 @@ class LangevinSampler:
             if step in save_indices:
                 trajectory.append(samples.detach().clone().cpu())
             
-            # Compute energy gradient
-            if samples.grad is not None:
-                samples.grad.zero_()
-                
             energy = self.model.energy(samples).sum()
-            energy.backward()
+            
+            # Use torch.autograd.grad to get gradients w.r.t. samples ONLY
+            # This prevents contamination of model parameter gradients
+            grad_x = torch.autograd.grad(energy, samples, only_inputs=True)[0]
 
-            # Langevin update: gradient descent + noise
+            # Langevin update is performed within a no_grad context
             with torch.no_grad():
-                if samples.grad is not None:
-                    samples.data -= self.step_size * samples.grad
+                if maximize_energy:
+                    # Gradient ascent: move in direction of gradient to maximize energy
+                    samples.data += self.step_size * grad_x
+                else:
+                    # Gradient descent: move opposite to gradient to minimize energy
+                    samples.data -= self.step_size * grad_x
+                
+                # Add noise
                 samples.data += self.noise_scale * torch.randn_like(samples)
-                samples.data = torch.clamp(samples.data, 0.0, 1.0)  # Keep samples in valid range [0, 1]
+                
+                # Clamp to valid pixel range
+                samples.data = torch.clamp(samples.data, 0.0, 1.0)
         
-        # Make sure we have the final step
-        if (self.num_steps - 1) not in save_indices:
-            trajectory.append(samples.detach().clone().cpu())
+        # Ensure the final step is always included in the trajectory
+        if (self.num_steps - 1) not in save_indices or not trajectory:
+             trajectory.append(samples.detach().clone().cpu())
 
-        # Put model back in eval mode
-        self.model.eval()
-        
         return samples.detach(), trajectory
 
-    def sample(self, initial_samples):
+    def sample(self, initial_samples, maximize_energy=None):
         """
         Perform Langevin sampling starting from initial samples.
         Args:
             initial_samples: Tensor of initial samples (batch_size, channels, height, width).
+            maximize_energy: Override the instance setting for this specific call.
         Returns:
             Final samples after Langevin dynamics.
         """
-        final_samples, _ = self.sample_with_trajectory(initial_samples, save_steps=2)
+        final_samples, _ = self.sample_with_trajectory(initial_samples, save_steps=2, maximize_energy=maximize_energy)
         return final_samples
+
+    def sample_negatives(self, positive_samples, save_steps=2):
+        """
+        Generate negative samples by maximizing energy starting from positive samples.
+        This is a convenience method specifically for training EBMs.
+        Args:
+            positive_samples: Tensor of positive samples to start from.
+            save_steps: Number of trajectory steps to save.
+        Returns:
+            Final negative samples after gradient ascent.
+        """
+        return self.sample_with_trajectory(positive_samples, save_steps=save_steps, maximize_energy=True)
 
 def visualize_sampling_trajectory(trajectory, sample_idx=0, title="Langevin Sampling Trajectory"):
     """
@@ -139,15 +158,20 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # Load the trained model
-    model_path = "trained_ebm.pth"
+    model_path = "trained_ebm_replay.pth"
     model, training_info = load_trained_ebm(model_path, device=device)
 
     # Initialize Langevin sampler
-    sampler = LangevinSampler(model, step_size=0.1, noise_scale=0.01, num_steps=1000, device=device)
+    sampler = LangevinSampler(model, step_size=0.1, noise_scale=0.01, num_steps=2000, device=device)
 
     # Select initial samples (random noise)
     batch_size = 1
-    initial_samples = torch.rand(batch_size, 1, 28, 28)  # Random noise in [0, 1]
+    # Pick a random image from test_images
+    random_idx = np.random.randint(0, len(train_images))
+    initial_img = train_images[random_idx]
+    initial_samples = torch.tensor(initial_img, dtype=torch.float32).unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+    noise = torch.randn_like(initial_samples) * 1  # Add some noise
+    initial_samples = noise  # Add noise to the image
     print(f"Starting Langevin sampling with {batch_size} samples...")
 
     # Perform Langevin sampling with trajectory

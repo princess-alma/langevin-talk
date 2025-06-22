@@ -7,11 +7,30 @@ Alma Ament
 
 ---
 
-## Image Example
+## From Newton to Langevin
 
-![Alt text](img/example.png)
-
-$$\mathbb{R}=\frac{e^{f(x)}}{\sum_i^n(g(y))}$$
+<section>
+  <div class="columns">
+    <div class="column">
+      <strong>Newtonian Mechanics</strong>
+      <ul>
+        <li>Smooth deceleration</li>
+        <li>One path</li>
+      </ul>
+      <!-- Optionally include an image or schematic here -->
+      <!-- <img src="img/newtonian.png" alt="Newtonian schematic" style="width:100%;"> -->
+    </div>
+    <div class="column">
+      <strong>Langevin Dynamics</strong>
+      <ul>
+        <li>Noisy, jittery path</li>
+        <li>Many possible paths</li>
+      </ul>
+      <!-- Optionally include an animation or schematic here -->
+      <!-- <img src="img/langevin.png" alt="Langevin schematic" style="width:100%;"> -->
+    </div>
+  </div>
+</section>
 
 ---
 

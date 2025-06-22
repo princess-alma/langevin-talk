@@ -24,3 +24,16 @@
     z-index: 1000;
   }
   
+
+  .columns {
+    display: flex;
+    flex-direction: row;
+    gap: 4vw;
+    width: 100%;
+    align-items: flex-start;
+  }
+  .column {
+    flex: 1;
+    min-width: 0;
+  }
+  

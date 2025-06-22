@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils.parametrizations import spectral_norm
 
 class EnergyBasedModel(nn.Module):
     """Energy-Based Model with CNN encoder outputting a single scalar energy value"""
@@ -9,10 +10,11 @@ class EnergyBasedModel(nn.Module):
         super(EnergyBasedModel, self).__init__()
         
         # CNN Encoder layers
-        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)
-        self.conv4 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1)
+        self.conv1 = spectral_norm(nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1))
+        self.conv2 = spectral_norm(nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1))
+        self.conv3 = spectral_norm(nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1))
+        self.conv4 = spectral_norm(nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1))
+
         
         # Batch normalization layers
         self.bn1 = nn.BatchNorm2d(32)
@@ -22,7 +24,7 @@ class EnergyBasedModel(nn.Module):
         
         # Calculate the size after convolutions for MNIST (28x28)
         # After conv2: 14x14, after conv3: 7x7, after conv4: 4x4
-        self.feature_size = 256 #* 4 * 4  # 4096
+        self.feature_size = 256
 
         self.global_pool = nn.AdaptiveAvgPool2d(1)
 
