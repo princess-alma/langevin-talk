@@ -11,10 +11,12 @@ Alma Ament
 
 ![Alt text](img/example.png)
 
+$$\mathbb{R}=\frac{e^{f(x)}}{\sum_i^n(g(y))}$$
+
 ---
 
 ## Video Example
-    
+
 <video controls width="600">
   <source src="media/example.mp4" type="video/mp4">
   Your browser does not support the video tag.
