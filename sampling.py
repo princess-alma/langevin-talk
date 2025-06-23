@@ -231,11 +231,11 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # Load the trained model
-    model_path = "trained_ebm.pth"
+    model_path = "trained_ebm_replay.pth"
     model, training_info = load_trained_ebm(model_path, device=device)
 
     # Initialize Langevin sampler
-    sampler = LangevinSampler(model, step_size=0.1, noise_scale=0.01, num_steps=2000, device=device)
+    sampler = LangevinSampler(model, step_size=0.01, noise_scale=0.01, num_steps=100, device=device)
 
     # Select initial samples (random noise)
     batch_size = 1
