@@ -92,18 +92,24 @@ def create_small_ball_updater(ball_index, small_balls, small_velocities, small_b
     return update_small_ball
 
 def create_small_balls(num_small_balls, small_ball_radius, box_center, box_size, 
-                      large_ball_position, large_ball_radius, visible=True):
+                      large_ball_position, large_ball_radius, visible=True, rng=None):
     """Create small thermal balls with random positions and velocities"""
+    
+    # Use the provided RNG object, or fall back to the global one
+    if rng is None:
+        rng = np.random
+        
     small_balls = []
     small_velocities = []
     
     for i in range(num_small_balls):
         # Random position inside the box
         while True:
-            x = np.random.uniform(-box_size + small_ball_radius + 0.05, 
-                                box_size - small_ball_radius - 0.05)
-            y = np.random.uniform(-box_size + small_ball_radius + 0.05, 
-                                box_size - small_ball_radius - 0.05)
+            # Use rng object instead of np.random
+            x = rng.uniform(-box_size + small_ball_radius + 0.05, 
+                            box_size - small_ball_radius - 0.05)
+            y = rng.uniform(-box_size + small_ball_radius + 0.05, 
+                            box_size - small_ball_radius - 0.05)
             pos = np.array([x + box_center[0], y + box_center[1], 0])
             
             # Ensure small balls don't start too close to large ball
@@ -126,9 +132,9 @@ def create_small_balls(num_small_balls, small_ball_radius, box_center, box_size,
         small_ball.move_to(pos)
         small_balls.append(small_ball)
         
-        # Random velocity for thermal motion
-        speed = np.random.uniform(1.5, 3.5)
-        angle = np.random.uniform(0, 2 * np.pi)
+        # Use rng object for velocity too
+        speed = rng.uniform(1.5, 3.5)
+        angle = rng.uniform(0, 2 * np.pi)
         velocity = np.array([speed * np.cos(angle), speed * np.sin(angle)])
         small_velocities.append(velocity)
     
@@ -183,4 +189,4 @@ class LangevinDynamics(Scene):
             ))
 
         # Run animation
-        self.wait(15)
+        self.wait(30)
