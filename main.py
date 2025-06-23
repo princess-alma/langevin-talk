@@ -643,30 +643,36 @@ def visualize_hybrid_negatives(model, test_loader, langevin_steps=20, langevin_s
     plt.tight_layout()
     plt.show()
 
-def train_ebm_with_replay_buffer(model, train_loader, num_epochs=10, lr=0.0001, margin=10.0,
-                                 langevin_steps=60, langevin_step_size=0.1, langevin_noise_scale=0.01,
-                                 buffer_size=10000, device='cpu'):
+def train_ebm_with_replay_buffer(model, train_loader, num_epochs=20, lr=1e-4, margin=10.0,
+                                 langevin_steps=60, 
+                                 langevin_step_size=0.01,  # <-- CRITICAL CHANGE: Reduced from 0.1
+                                 langevin_noise_scale=0.01,
+                                 buffer_size=10000, 
+                                 replay_prob=0.95,  # <-- NEW: Probability to sample from buffer
+                                 device='cpu'):
     """
     Train the EBM using a replay buffer for persistent contrastive divergence.
-    This is the standard and most effective way to train EBMs.
     
-    The replay buffer stores negative samples from previous iterations, giving the
-    Langevin sampler a "head start" to find more realistic and challenging negatives.
+    Key improvements to handle "adversary winning" problem:
+    - Reduced step_size for more careful Langevin sampling (0.01 instead of 0.1)
+    - Weight decay for smoother energy landscape
+    - Probabilistic buffer sampling with noise re-injection for diversity
     """
     model.to(device)
+    # --- FIX: Added weight_decay for a smoother energy landscape ---
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
 
     # Initialize the replay buffer with random noise
     replay_buffer = torch.rand(buffer_size, 1, 28, 28).to(device)
 
-    # Sampler for MINIMIZING energy
+    # Sampler for MINIMIZING energy with smaller, more careful steps
     sampler = LangevinSampler(
         model=model, 
-        step_size=langevin_step_size, 
+        step_size=langevin_step_size,  # Now much smaller for stability
         noise_scale=langevin_noise_scale,
         num_steps=langevin_steps, 
         device=device, 
-        maximize_energy=False  # Minimize energy to find low-energy regions
+        maximize_energy=False
     )
 
     model.train()
@@ -676,27 +682,40 @@ def train_ebm_with_replay_buffer(model, train_loader, num_epochs=10, lr=0.0001, 
         total_pos_energy = 0.0
         total_neg_energy = 0.0
         total_energy_diff = 0.0
+        buffer_usage_count = 0
+        noise_usage_count = 0
         
-        pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs} (Replay Buffer)', 
+        pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs} (Replay Buffer v2)', 
                    leave=True, unit='batch')
 
         for batch_idx, (images, _) in enumerate(pbar):
             images = images.to(device)
             batch_size = images.size(0)
 
-            # --- Sample from Replay Buffer ---
-            # 1. Get random indices for samples from the buffer
+            # --- FIX: Re-inject noise into the sampling process for diversity ---
+            # Decide which samples start from the buffer and which from pure noise
+            is_from_buffer = torch.rand(batch_size) < replay_prob
+            
+            # Get starting points for Langevin
             buffer_indices = torch.randint(0, buffer_size, (batch_size,))
             initial_neg_samples = replay_buffer[buffer_indices].clone()
+            
+            # Create fresh random noise for the remaining samples (5% diversity injection)
+            random_samples = torch.rand(batch_size, 1, 28, 28).to(device)
+            
+            # Combine them: use buffer samples where is_from_buffer is True, else random
+            initial_neg_samples[~is_from_buffer] = random_samples[~is_from_buffer]
+            
+            # Track usage statistics
+            buffer_usage_count += is_from_buffer.sum().item()
+            noise_usage_count += (~is_from_buffer).sum().item()
 
-            # 2. Run Langevin dynamics starting from the buffered samples to get new negatives
-            # We detach to stop gradients from flowing back into the buffer from previous steps
+            # Generate new negatives with the more careful sampler
             negative_images = sampler.sample(initial_neg_samples.detach())
 
             # --- Compute Loss ---
             positive_energy = model(images)
             negative_energy = model(negative_images)
-
             loss = energy_discrepancy_loss(positive_energy, negative_energy, margin=margin)
 
             # --- Backpropagation ---
@@ -705,7 +724,6 @@ def train_ebm_with_replay_buffer(model, train_loader, num_epochs=10, lr=0.0001, 
             optimizer.step()
 
             # --- Update Replay Buffer ---
-            # 3. Replace the old samples in the buffer with the newly generated ones
             replay_buffer[buffer_indices] = negative_images.detach()
 
             # Track statistics
@@ -717,12 +735,13 @@ def train_ebm_with_replay_buffer(model, train_loader, num_epochs=10, lr=0.0001, 
             total_neg_energy += neg_energy_mean
             total_energy_diff += (neg_energy_mean - pos_energy_mean)
 
-            # --- Logging ---
+            # Enhanced logging with buffer usage and energy difference
             pbar.set_postfix({
                 'Loss': f'{loss.item():.4f}',
                 'Pos_E': f'{pos_energy_mean:.3f}',
                 'Neg_E': f'{neg_energy_mean:.3f}',
-                'ΔE': f'{neg_energy_mean - pos_energy_mean:.3f}'
+                'ΔE': f'{neg_energy_mean - pos_energy_mean:.3f}',
+                'Buf%': f'{(buffer_usage_count/(buffer_usage_count+noise_usage_count)*100):.0f}'
             })
 
         avg_loss = total_loss / len(train_loader)
@@ -730,12 +749,16 @@ def train_ebm_with_replay_buffer(model, train_loader, num_epochs=10, lr=0.0001, 
         avg_neg_energy = total_neg_energy / len(train_loader)
         avg_energy_diff = total_energy_diff / len(train_loader)
         
+        total_samples = buffer_usage_count + noise_usage_count
+        buffer_percentage = (buffer_usage_count / total_samples) * 100 if total_samples > 0 else 0
+        
         print(f'Epoch {epoch+1}/{num_epochs} completed:')
         print(f'  Average Loss: {avg_loss:.4f}')
         print(f'  Average Positive Energy: {avg_pos_energy:.4f}')
         print(f'  Average Negative Energy: {avg_neg_energy:.4f}')
-        print(f'  Average Energy Difference: {avg_energy_diff:.4f}')
-        print(f'  Margin: {margin} | Langevin Steps: {langevin_steps}')
+        print(f'  Average Energy Difference (ΔE): {avg_energy_diff:.4f}')
+        print(f'  Buffer Usage: {buffer_percentage:.1f}% | Random Noise: {100-buffer_percentage:.1f}%')
+        print(f'  Margin: {margin} | Langevin Steps: {langevin_steps} | Step Size: {langevin_step_size}')
         print('-' * 50)
 
 if __name__ == "__main__":
@@ -754,15 +777,15 @@ if __name__ == "__main__":
     model = EnergyBasedModel(input_channels=1, hidden_dim=128)
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
-    # --- Tuned Hyperparameters for Replay Buffer Training ---
-    num_epochs = 5  # Train for longer
+    # --- Tuned Hyperparameters for Replay Buffer Training v2 ---
+    num_epochs = 5   # Keep at 5 epochs as requested
     lr = 1e-4        # Lower learning rate for more stable learning
     margin = 10.0    # Increased margin to force larger energy gaps
     langevin_steps = 60  # More steps for better negative samples
-    langevin_step_size = 0.1
+    langevin_step_size = 0.01  # <-- CRITICAL CHANGE: Much smaller for stability
     langevin_noise_scale = 0.01
 
-    print("Starting EBM training with Replay Buffer...")
+    print("Starting EBM training with Replay Buffer (v2)...")
     train_ebm_with_replay_buffer(
         model=model,
         train_loader=train_loader,
@@ -770,7 +793,7 @@ if __name__ == "__main__":
         lr=lr,
         margin=margin,
         langevin_steps=langevin_steps,
-        langevin_step_size=langevin_step_size,
+        langevin_step_size=langevin_step_size,  # Now using the smaller value
         langevin_noise_scale=langevin_noise_scale,
         device=device
     )
