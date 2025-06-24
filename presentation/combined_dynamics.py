@@ -27,7 +27,7 @@ class CombinedDynamics(Scene):
         small_ball_radius = 0.05  # Slightly larger for visibility
         
         # Create separate, but identically seeded, random number generators
-        rng_seed = 42
+        rng_seed = 420
         left_rng = np.random.RandomState(rng_seed)
         right_rng = np.random.RandomState(rng_seed)
         
@@ -139,4 +139,4 @@ class CombinedDynamics(Scene):
                 ))
 
         # Run animation
-        self.wait(30)  # Reduced from 30 to 15 seconds for faster testing
+        self.wait(20)  # Reduced from 30 to 15 seconds for faster testing

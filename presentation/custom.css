@@ -1,3 +1,4 @@
+
 /* Top-left alignment for all other slides */
 .reveal .slides section:not(.cover-slide) {
     display: block;
@@ -28,7 +29,7 @@
   .columns {
     display: flex;
     flex-direction: row;
-    gap: 4vw;
+    gap: 3vw;
     width: 100%;
     align-items: flex-start;
   }
