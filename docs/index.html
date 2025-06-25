@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8">
     <title>My Reveal.js Markdown Slides</title>
-    <link rel="stylesheet" href="dist/reveal.css">
-    <link rel="stylesheet" href="dist/theme/white.css">
-    <link rel="stylesheet" href="custom.css">
+    <link rel="stylesheet" href="./dist/reveal.css">
+    <link rel="stylesheet" href="./dist/theme/white.css">
+    <link rel="stylesheet" href="./custom.css">
   </head>
   <body>
     <div class="reveal">
@@ -20,9 +20,9 @@
       </div>
     </div>
     <script type="module">
-      import Reveal from 'dist/reveal.esm.js';
-      import Markdown from 'plugin/markdown/markdown.esm.js';
-      import RevealMath from 'plugin/math/math.esm.js';
+      import Reveal from './dist/reveal.esm.js';
+      import Markdown from './plugin/markdown/markdown.esm.js';
+      import RevealMath from './plugin/math/math.esm.js';
 
       let deck = new Reveal({
         plugins: [ Markdown, RevealMath ],
