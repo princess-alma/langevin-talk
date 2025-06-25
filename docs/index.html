@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <title>My Reveal.js Markdown Slides</title>
-    <link rel="stylesheet" href="node_modules/reveal.js/dist/reveal.css">
-    <link rel="stylesheet" href="node_modules/reveal.js/dist/theme/white.css">
+    <link rel="stylesheet" href="dist/reveal.css">
+    <link rel="stylesheet" href="dist/theme/white.css">
     <link rel="stylesheet" href="custom.css">
   </head>
   <body>
@@ -20,9 +20,9 @@
       </div>
     </div>
     <script type="module">
-      import Reveal from './node_modules/reveal.js/dist/reveal.esm.js';
-      import Markdown from './node_modules/reveal.js/plugin/markdown/markdown.esm.js';
-      import RevealMath from './node_modules/reveal.js/plugin/math/math.esm.js';
+      import Reveal from 'dist/reveal.esm.js';
+      import Markdown from 'plugin/markdown/markdown.esm.js';
+      import RevealMath from 'plugin/math/math.esm.js';
 
       let deck = new Reveal({
         plugins: [ Markdown, RevealMath ],
