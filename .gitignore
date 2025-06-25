@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 /presentation/media
 /docs/media
+/node_modules
+*.log
