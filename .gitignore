@@ -5,3 +5,4 @@ __pycache__/
 /docs/media
 /node_modules
 *.log
+/.vscode

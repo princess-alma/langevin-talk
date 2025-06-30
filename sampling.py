@@ -231,11 +231,11 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # Load the trained model
-    model_path = "trained_ebm_replay.pth"
+    model_path = "trained_ebm.pth"
     model, training_info = load_trained_ebm(model_path, device=device)
 
     # Initialize Langevin sampler
-    sampler = LangevinSampler(model, step_size=0.01, noise_scale=0.01, num_steps=100, device=device)
+    sampler = LangevinSampler(model, step_size=0.1, noise_scale=0.01, num_steps=1000, device=device)
 
     # Select initial samples (random noise)
     batch_size = 1
@@ -248,16 +248,16 @@ if __name__ == "__main__":
     print(f"Starting Langevin sampling with {batch_size} samples...")
 
     # Perform Langevin sampling with trajectory
-    #final_samples, trajectory = sampler.sample_with_trajectory(initial_samples, save_steps=36)
+    final_samples, trajectory = sampler.sample_with_trajectory(initial_samples, save_steps=36)
 
     #print(f"Sampling completed! Saved {len(trajectory)} steps.")
     
     # Visualize trajectory for the first sample
-    #visualize_sampling_trajectory(trajectory, sample_idx=0, title="Langevin Sampling: Random Noise → MNIST-like Digit")
+    visualize_sampling_trajectory(trajectory, sample_idx=0, title="Langevin Sampling: Random Noise → MNIST-like Digit")
     
     # Also show trajectories for other samples
     #for i in range(1, min(batch_size, 3)):
     #    visualize_sampling_trajectory(trajectory, sample_idx=i, title=f"Langevin Sampling Trajectory - Sample {i+1}")
     
     # Visualize batch sampling results
-    visualize_batch_sampling(model, num_samples=36, num_steps=2000, step_size=0.1, noise_scale=0.01, device=device, title="Batch Sampling Results")
+    #visualize_batch_sampling(model, num_samples=36, num_steps=2000, step_size=0.1, noise_scale=0.01, device=device, title="Batch Sampling Results")
