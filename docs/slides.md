@@ -98,7 +98,7 @@ $$U(x)=- \log p(x)$$
 
 In Practice, we rather use
 
-$$U(\theta)=- \log p(\theta | x_{1:n})$$
+$$U(\theta)=- \log p(\theta | x_{1:n}) = - \log p(\theta | \mathcal{D})$$
 
 ---
 
@@ -110,7 +110,7 @@ $$\theta^*=\arg\min_{\theta\in\Theta} U(\theta)=\arg\min_{\theta\in\Theta} -\log
 
 Solution via **Gradient Descent**:
 
-$$\theta^{(n+1)} = \theta^{(n)} -\alpha \left. \nabla U(\theta)\right|_{\theta=\theta^{(n)}} $$
+$$\theta^{(n+1)} = \theta^{(n)} -\alpha \nabla U(\theta) $$
 
 ---
 
@@ -120,19 +120,19 @@ Learning defined as **Sampling from the Posterior** given the training data:
 
 $$p(\theta|\mathcal{D}) \propto p(\mathcal{D}|\theta)p(\theta)$$
 
-Simulating samples via **Langevin Monte Carlo**:
+Simulating samples via **Unadjusted Langevin Algorithm**:
 
 $$\theta_{t+1} = \theta_t - \epsilon_t \nabla U(\theta_t) + \sqrt{2\epsilon_t} Z_t, \text{with } Z_t \sim \mathcal{N}(0, I)$$
 
-LMC is a discretization of the Langevin diffusion using the **Euler-Maruyama** method:
+ULA is a discretization of the Langevin diffusion using the **Euler-Maruyama** method:
 
 $$
-\lim_{\epsilon_t \to 0} \lim_{t \to \infty} q_t(\theta) = p(\theta | \mathcal{D})
+\lim_{\epsilon_t \to 0} q_t(\theta) = p(\theta | \mathcal{D})
 $$
 
 ---
 
-## Properties of Langevin Monte Carlo
+## Properties of ULA
 
 * ✅ Captures uncertainty in learned parameters
 
@@ -150,7 +150,7 @@ $$
 
 ---
 
-## SGLD – Update Rule
+## Stochastic Gradient Langevin Dynamics
 
 We approximate the gradient with mini-batch gradients. At each iteration $t$, the parameters are updated as:
 
@@ -163,7 +163,7 @@ $$\Delta \theta_t = - \epsilon_t \nabla \tilde{U}(\theta_t) + \sqrt{2\epsilon_t}
 * Noisy gradient: $\nabla \tilde{U}(\theta_t)$
 * Injected Gaussian Noise: $\sqrt{2\epsilon_t} Z_t$
 
----
+--
 
 ## SGLD – Update Rule in Detail
 
@@ -206,54 +206,110 @@ Then $q_t$ evolves according to the **Fokker-Planck Equation**:
 
 $$\frac{\partial q_t}{\partial t} = \nabla \cdot (q_t \nabla U ) + \Delta  q_t$$
 
-
 ---
 
 ## The Benefits of SGLD
 
-* Guarantee for convergence without full batch gradient computations $\rightarrow$ Unlocks Bayesian Learning for large scale datasets (Welling, Teh 2011)
+* **Scalable Bayesian Learning**: Enables Bayesian inference on large datasets by avoiding full gradient computations (Welling, Teh 2011)
 
-* Smoothly and automatically transitions from stochastic optimisation to sampling from the posterior
+* **Seamless Transition**: Automatically shifts from optimization to posterior sampling
 
-* It is an **Anytime Algorithm**
+* **Anytime Results**: As an "anytime" algorithm, it provides usable samples throughout the process, even if stopped early
 
 ---
 
-## SGD vs SGLD
+## Exploration vs Exploitation
+
+**Initial Phase (Large $\epsilon_t$) – Optimization**
+*   The gradient term $- \epsilon_t \nabla \tilde{U}(\theta_t)$ dominates.
+*   The algorithm behaves like SGD, rapidly moving towards areas of high probability (low potential energy).
+
+**Final Phase (Small $\epsilon_t$) – Sampling**
+*   The injected noise $\sqrt{2\epsilon_t} Z_t$ becomes comparable to the gradient step.
+*   The algorithm ceases to converge to a single point and instead starts exploring the region around the minimum.
+
+After crossing the **Sampling Threshold** we can save every few steps and use them as a **Bayesian Ensemble** 
 
 ---
 
 ## Limitations of SGLD
 
+
+* **Tuning Sensitivity:** The step size schedule requires careful and often difficult tuning
+
+* **Isotropic Noise:** The assumption of uniform Gaussian noise $\mathcal{N}(0, I)$ can slow down convergence
+
+* **Discretization Error:** The use of discrete steps introduces a bias in the final distribution
+
 ---
 
-## Comparison of Step Size Schedules
+## Step Size Schedules
 
----
+**Polynomial Schedule**
+$$
+\epsilon_t = a(b+t)^{-\gamma}
+$$
+*   **$a$ (scale):** Controls the initial step size
+*   **$b \geq 0$ (stability):** Stabilizes initial iterations
+*   **$\gamma \in (0.5, 1]$ (decay rate):** Controls how quickly the step size decreases
 
-## Sampling threshold
+**Cosine Annealing Schedule**
+
+$$
+\epsilon_t = \epsilon_{\text{min}} + \frac{1}{2} (\epsilon_{\text{max}} - \epsilon_{\text{min}}) \left[ 1 + \cos\left( \frac{\pi * \mathrm{mod}(t-1, T)}{T} \right) \right]
+$$
 
 ---
 
 ## Preconditioning
 
----
+The preconditioned SGLD update becomes:
+$$
+\Delta \theta_t = - \epsilon_t G(\theta_t)^{-1} \nabla \tilde{U}(\theta_t) + \sqrt{2\epsilon_t G(\theta_t)^{-1}} Z_t
+$$
 
-## Metropolis-Hastings Acceptance Criterion
+*   $G(\theta_t)$ is a positive definite matrix that captures the local geometry of the potential $U(\theta)$
+*   A common choice is a diagonal matrix based on the running average of squared past gradients (similar to RMSprop).
+*   This allows for larger steps in "flat" directions and smaller, more cautious steps in "steep" directions, leading to much faster mixing.
 
-
----
-
-## Ignoring the MH Step
 
 ---
 
 ## Metropolis Adjusted Langevin Algorithm
 
+MALA corrects the discretization error and guarantees **exact convergence** to the posterior. At each iteration $t$:
+
+1.  **Langevin Proposal:** Same as ULA
+
+
+$$
+\theta' = \theta_t - \frac{\epsilon}{2} \nabla U(\theta_t) + \sqrt{\epsilon}Z_t, \quad Z_t \sim \mathcal{N}(0, I)
+$$
+    
+2.  **Metropolis-Hastings Correction:** 
+
+
+$$
+\alpha = \min\left(1, \frac{p(\theta'|\mathcal{D}) q(\theta_t|\theta')}{p(\theta_t|\mathcal{D}) q(\theta'|\theta_t)}\right)
+$$
+
+
 ---
 
-## The Big Picture
+## Ignoring the MH Step in SGLD
+
+**Computational Cost:** Calculating the acceptance probability $\alpha$ requires evaluating the full posterior $p(\theta|\mathcal{D})$ at both $\theta_t$ and $\theta'$.
+$$
+p(\theta'|\mathcal{D}) \propto p(\theta') \prod_{i=1}^N p(y_i|\theta')
+$$
+
+**High Acceptance Probability** as $\epsilon_t\rightarrow 0$ 
+
+$$
+\alpha(\theta_t, \theta') = \min \left( 1, \frac{p(\theta'|\mathcal{D}) q(\theta_t | \theta')}{p(\theta_t|\mathcal{D}) q(\theta' | \theta_t)} \right)\rightarrow 1
+$$
 
 ---
+
 
 ## References
