@@ -112,11 +112,11 @@ class PathVisualization(Scene):
                 for point in path
             ]
             
-            # Create path line
+            # Create path line - made thinner
             if len(manim_points) >= 2:
                 path_line = VMobject()
                 path_line.set_points_as_corners(manim_points)
-                path_line.set_stroke(color=color, width=4, opacity=0.9)
+                path_line.set_stroke(color=color, width=2.5, opacity=0.9)  # Reduced from 4 to 2.5
                 path_group.add(path_line)
             
             if self.show_dots:
@@ -127,24 +127,29 @@ class PathVisualization(Scene):
                     dots.add(dot)
                 path_group.add(dots)
             
-            if self.show_arrows and len(manim_points) >= 2:
-                arrows = VGroup()
-                arrow_interval = max(1, len(manim_points) // 12) # Adjusted for clarity
-                for j in range(0, len(manim_points) - arrow_interval, arrow_interval):
-                    start_pt = manim_points[j]
-                    end_pt = manim_points[j + arrow_interval]
-                    direction = end_pt - start_pt
-                    if np.linalg.norm(direction) > 0.01: # Avoid zero-length arrows
-                        arrow = Arrow(
-                            start_pt, end_pt, 
-                            color=color, 
-                            stroke_width=5, 
-                            tip_length=0.2, 
-                            max_tip_length_to_length_ratio=0.5,
-                            buff=0
-                        )
-                        arrows.add(arrow)
-                path_group.add(arrows)
+            # Remove arrows - commenting out the entire arrow section
+            # if self.show_arrows and len(manim_points) >= 2:
+            #     arrows = VGroup()
+            #     arrow_interval = max(1, len(manim_points) // 12) # Adjusted for clarity
+            #     for j in range(0, len(manim_points) - arrow_interval, arrow_interval):
+            #         start_pt = manim_points[j]
+            #         end_pt = manim_points[j + arrow_interval]
+            #         direction = end_pt - start_pt
+            #         if np.linalg.norm(direction) > 0.01: # Avoid zero-length arrows
+            #             arrow = Arrow(
+            #                 start_pt, end_pt, 
+            #                 color=color, 
+            #                 stroke_width=5, 
+            #                 tip_length=0.2, 
+            #                 max_tip_length_to_length_ratio=0.5,
+            #                 buff=0
+            #             )
+            #             arrows.add(arrow)
+            #     path_group.add(arrows)
+            
+            # Add empty VGroup for arrows to maintain structure
+            arrows = VGroup()
+            path_group.add(arrows)
             
             path_mobjects.append(path_group)
         
@@ -339,7 +344,7 @@ class CustomPathVisualization(PathVisualization):
         sgld_steps = 300                      # SGLD iterations
         
         # SGLD noise parameters
-        noise_strength = 1.2                    # SGLD exploration strength
+        noise_strength = 1.2                  # SGLD exploration strength
         
         # Visualization parameters
         coord_range = (-4, 4, 1)             # Coordinate system range
