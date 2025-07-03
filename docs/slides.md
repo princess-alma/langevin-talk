@@ -231,7 +231,7 @@ $$\frac{\partial q_t}{\partial t} = \nabla \cdot (q_t \nabla U ) + \Delta  q_t$$
 
 ## Exploration vs Exploitation
 
-**Initial Phase (Large $\epsilon_t$) – Optimization**
+**Initial Phase (Large $\epsilon_t$) – Optimization (Burn-in)**
 *   The gradient term $- \epsilon_t \nabla \tilde{U}(\theta_t)$ dominates.
 *   The algorithm behaves like SGD, rapidly moving towards areas of high probability (low potential energy).
 
@@ -284,6 +284,10 @@ $$
 ---
 
 ## Preconditioning
+
+<div style="position: absolute; top: 0; right: 20px; display: flex; gap: 10px;">
+  <img src="images/elongated_valley_3d.png" alt="Elongated valley" style="width: 200px; height: 200px; object-fit: cover; border-radius: 5px;">
+</div>
 
 The preconditioned SGLD update becomes:
 $$
