@@ -142,7 +142,7 @@ $$
 
 * ❌ Update step requires computation over the whole dataset
 
-* ❌ Requires significantly more steps than GD (~20x)
+* ❌ Requires significantly more steps than GD
 
 * ❌ Known negative result for Bayesian Online Learning (Particle Degeneracy – Andrieu et al. 1999)
 
