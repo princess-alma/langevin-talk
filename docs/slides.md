@@ -283,7 +283,7 @@ MALA corrects the discretization error and guarantees **exact convergence** to t
 
 
 $$
-\theta' = \theta_t - \frac{\epsilon}{2} \nabla U(\theta_t) + \sqrt{\epsilon}Z_t, \quad Z_t \sim \mathcal{N}(0, I)
+\theta' = \theta_t - \frac{\epsilon_t}{2} \nabla U(\theta_t) + \sqrt{\epsilon_t}Z_t, \quad Z_t \sim \mathcal{N}(0, I)
 $$
     
 2.  **Metropolis-Hastings Correction:** 
