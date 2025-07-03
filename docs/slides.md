@@ -191,6 +191,17 @@ $$
 
 ---
 
+## SGD vs SGLD
+
+<div style="text-align: center;">
+  <video controls width="80%" style="margin-top: -30px; max-width: 100%; height: auto; outline: none; border: none;" onclick="this.blur();">
+    <source src="sgd_vs_sgld.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+</div>
+
+---
+
 ## Guarantee for Convergence
 
 For SGLD to converge to the true posterior:
@@ -261,6 +272,17 @@ $$
 
 ---
 
+## Step Size Schedules
+
+<div style="text-align: center;">
+  <video controls width="80%" style="margin-top: -30px; max-width: 100%; height: auto; outline: none; border: none;" onclick="this.blur();">
+    <source src="step_size_schedules.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+</div>
+
+---
+
 ## Preconditioning
 
 The preconditioned SGLD update becomes:
@@ -311,5 +333,22 @@ $$
 
 ---
 
+## Other Methods
+
+<div style="text-align: center;">
+  <img style="margin-top: 0; width: 100%;" src="images/big_picture_outro.png">
+</div>
+
+---
 
 ## References
+
+Welling, Teh (2011), Bayesian Learning via Stochastic Gradient Langevin Dynamics
+
+Xifara et al, (2013) Langevin diffusions and the Metropolis-adjusted Langevin algorithm
+
+Garriga-Alonso, Fortuin (2020), Exact Langevin Dynamics with Stochastic Gradients
+
+Goodsell, Hanson (1976), Almost Sure Convergence for the Robbins–Monro Process
+
+Jaynes (1957), Information theory and statistical mechanics

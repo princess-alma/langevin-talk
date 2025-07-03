@@ -156,21 +156,21 @@ class PathVisualization(Scene):
         return path_mobjects
     
     def create_legend(self) -> VGroup:
-        """Create a legend for the paths."""
+        """Create a legend for the paths positioned to the right."""
         legend = VGroup()
         for i, (label, color) in enumerate(zip(self.path_labels, self.path_colors)):
             line = Line(ORIGIN, RIGHT * 0.5, color=color, stroke_width=6)
             # DEBUG: Use a color that contrasts with the background
             text_color = self.camera.background_color.invert()
-            text = Text(label, font_size=24, color=text_color)
+            text = Text(label, font_size=18, color=text_color)  # Reduced from 24 to 18
             
             entry = VGroup(line, text.next_to(line, RIGHT, buff=0.2))
             legend.add(entry)
         
         # Arrange legend entries vertically
         legend.arrange(DOWN, buff=0.2)
-        # Position the legend in the top right corner
-        legend.to_corner(UR, buff=0.5)
+        # Position the legend in the top right corner, but keep it within frame
+        legend.to_corner(UR, buff=0.5)  # Removed the extra RIGHT shift to keep it in frame
         return legend
     
     def construct(self):
@@ -397,3 +397,201 @@ class CustomPathVisualization(PathVisualization):
             current_pos -= sgld_lr * grad + noise * np.sqrt(2 * sgld_lr * noise_strength)
 
         return [np.array(sgd_path), np.array(sgld_path)]
+
+
+# Add this new class for multimodal SGLD schedule comparison
+
+class MultimodalSGLDVisualization(PathVisualization):
+    """
+    Visualization comparing different SGLD step size schedules on a highly multimodal landscape.
+    Shows three SGLD variants:
+    1. Polynomial decay (high decay rate)
+    2. Polynomial decay (low decay rate) 
+    3. Cosine annealing schedule
+    """
+    
+    def __init__(self, **kwargs):
+        distribution = self.create_multimodal_distribution()
+        
+        # Parameters for all SGLD variants
+        start_point = np.array([3.5, 3.5])    # Start far from any mode
+        base_lr = 0.15                        # Base learning rate
+        num_steps = 800                       # More steps to see schedule effects
+        noise_strength = 0.8                  # Strong noise for exploration
+        
+        # Generate paths with different schedules
+        paths = self.generate_sgld_schedule_paths(
+            distribution, start_point, base_lr, num_steps, noise_strength
+        )
+        
+        super().__init__(
+            distribution_func=distribution,
+            paths=paths,
+            path_labels=["High Decay", "Low Decay", "Cyclical"],
+            path_colors=["#FF6B6B", "#4ECDC4", "#9B59B6"],  # Red, Teal, Purple
+            x_range=(-4, 4, 1), 
+            y_range=(-4, 4, 1),
+            contour_levels=25,  # More contours for complex landscape
+            contour_color_map=plt.cm.gray,  # Use gray colormap for black contours
+            animation_time=15.0,  # Longer animation for more steps
+            **kwargs
+        )
+    
+    def create_multimodal_distribution(self) -> Callable:
+        """Create a highly multimodal distribution with grid of modes."""
+        def multimodal_grid(X, Y):
+            # Create a 3x3 grid of Gaussian modes
+            modes = []
+            
+            # Grid positions
+            positions = [
+                [-2.5, -2.5], [0, -2.5], [2.5, -2.5],    # Bottom row
+                [-2.5, 0],    [0, 0],    [2.5, 0],       # Middle row
+                [-2.5, 2.5],  [0, 2.5],  [2.5, 2.5]      # Top row
+            ]
+            
+            # Different strengths and shapes for variety
+            strengths = [1.5, 2.0, 1.2, 1.8, 2.5, 1.3, 1.6, 1.9, 1.4]
+            covariances = [
+                [[0.3, 0.1], [0.1, 0.3]],     # Slightly elongated
+                [[0.2, 0], [0, 0.4]],         # Vertically stretched
+                [[0.4, -0.1], [-0.1, 0.2]],   # Tilted
+                [[0.25, 0], [0, 0.25]],       # Circular
+                [[0.2, 0], [0, 0.2]],         # Small and tight (strongest mode)
+                [[0.35, 0.05], [0.05, 0.35]], # Medium
+                [[0.3, -0.05], [-0.05, 0.3]], # Slightly tilted
+                [[0.28, 0], [0, 0.3]],        # Oval
+                [[0.32, 0.08], [0.08, 0.25]]  # Irregular
+            ]
+            
+            total_prob = 0
+            for pos, strength, cov in zip(positions, strengths, covariances):
+                mode_prob = strength * multivariate_normal.pdf(
+                    np.dstack([X, Y]), mean=pos, cov=cov
+                )
+                total_prob += mode_prob
+            
+            # Return negative log probability for energy landscape
+            return -np.log(total_prob + 1e-9)
+        
+        return multimodal_grid
+    
+    def generate_sgld_schedule_paths(self, dist_func, start_point, base_lr, num_steps, noise_strength):
+        """Generate SGLD paths with different step size schedules."""
+        
+        def get_grad(x, y):
+            h = 1e-5
+            dx = (dist_func(x + h, y) - dist_func(x - h, y)) / (2 * h)
+            dy = (dist_func(x, y + h) - dist_func(x, y - h)) / (2 * h)
+            return np.array([dx, dy])
+        
+        def polynomial_schedule(step, total_steps, base_lr, decay_rate):
+            """Polynomial decay: lr = base_lr * (1 - step/total_steps)^decay_rate"""
+            progress = step / total_steps
+            return base_lr * (1 - progress) ** decay_rate
+        
+        def cosine_annealing_schedule(step, total_steps, base_lr, min_lr=0.01):
+            """Cosine annealing with multiple cycles: lr oscillates continuously"""
+            # Use multiple cycles (e.g., 4 cycles over the total steps)
+            num_cycles = 8
+            cycle_length = total_steps / num_cycles
+            cycle_position = (step % cycle_length) / cycle_length
+            return min_lr + 0.5 * (base_lr - min_lr) * (1 + np.cos(2 * np.pi * cycle_position))
+        
+        all_paths = []
+        
+        # 1. SGLD with High Polynomial Decay (aggressive cooling)
+        path_high_decay = []
+        current_pos = start_point.copy()
+        for step in range(num_steps):
+            path_high_decay.append(current_pos.copy())
+            
+            # High decay rate (lr drops quickly)
+            lr = polynomial_schedule(step, num_steps, base_lr, decay_rate=2.5)
+            
+            grad = get_grad(current_pos[0], current_pos[1])
+            noise = np.random.normal(0, 1, size=2)
+            current_pos -= lr * grad + noise * np.sqrt(2 * lr * noise_strength)
+        
+        all_paths.append(np.array(path_high_decay))
+        
+        # 2. SGLD with Low Polynomial Decay (gentle cooling)
+        path_low_decay = []
+        current_pos = start_point.copy()
+        for step in range(num_steps):
+            path_low_decay.append(current_pos.copy())
+            
+            # Low decay rate (lr drops slowly)
+            lr = polynomial_schedule(step, num_steps, base_lr, decay_rate=1.0)
+            
+            grad = get_grad(current_pos[0], current_pos[1])
+            noise = np.random.normal(0, 1, size=2)
+            current_pos -= lr * grad + noise * np.sqrt(2 * lr * noise_strength)
+        
+        all_paths.append(np.array(path_low_decay))
+        
+        # 3. SGLD with Cosine Annealing (periodic exploration)
+        path_cosine = []
+        current_pos = start_point.copy()
+        for step in range(num_steps):
+            path_cosine.append(current_pos.copy())
+            
+            # Cosine annealing (lr oscillates)
+            lr = cosine_annealing_schedule(step, num_steps, base_lr + 0.05)
+            
+            grad = get_grad(current_pos[0], current_pos[1])
+            noise = np.random.normal(0, 1, size=2)
+            current_pos -= lr * grad + noise * np.sqrt(2 * lr * noise_strength)
+        
+        all_paths.append(np.array(path_cosine))
+        
+        return all_paths
+
+
+# Also create a custom legend for the schedule comparison
+class MultimodalSGLDVisualizationWithLegend(MultimodalSGLDVisualization):
+    """Extended version with detailed legend showing the schedules."""
+    
+    def create_legend(self) -> VGroup:
+        """Create a detailed legend explaining the different schedules."""
+        legend = VGroup()
+        text_color = self.camera.background_color.invert()
+        
+        # Title
+        title = Text("SGLD Step Size Schedules", font_size=20, color=text_color, weight=BOLD)
+        legend.add(title)
+        
+        # Schedule descriptions
+        descriptions = [
+            "High Polynomial Decay: lr ∝ (1-t)²",
+            "Low Polynomial Decay: lr ∝ (1-t)^0.5", 
+            "Cosine Annealing: lr oscillates"
+        ]
+        
+        for i, (label, color, desc) in enumerate(zip(self.path_labels, self.path_colors, descriptions)):
+            # Color line
+            line = Line(ORIGIN, RIGHT * 0.4, color=color, stroke_width=4)
+            
+            # Algorithm name
+            algo_text = Text(label, font_size=16, color=text_color, weight=BOLD)
+            
+            # Description
+            desc_text = Text(desc, font_size=12, color=text_color)
+            
+            # Arrange horizontally
+            entry = VGroup(
+                line,
+                algo_text.next_to(line, RIGHT, buff=0.15),
+                desc_text.next_to(algo_text, DOWN, buff=0.05, aligned_edge=LEFT)
+            )
+            
+            legend.add(entry)
+        
+        # Arrange legend vertically with spacing
+        legend.arrange(DOWN, buff=0.4, aligned_edge=LEFT)
+        
+        # Position in top-left corner
+        legend.to_corner(UL, buff=0.5)
+        legend.scale(0.8)  # Make it a bit smaller
+        
+        return legend
