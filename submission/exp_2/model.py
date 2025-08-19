@@ -24,4 +24,4 @@ class SimpleMLP(nn.Module):
 
 def get_moons_model():
     """Get the model for moons classification - small and challenging."""
-    return SimpleMLP(input_size=2, hidden_size=1, num_classes=2)
+    return SimpleMLP(input_size=2, hidden_size=2, num_classes=2)
