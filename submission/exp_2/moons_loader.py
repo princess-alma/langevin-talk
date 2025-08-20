@@ -6,7 +6,6 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.datasets import make_moons
 from sklearn.model_selection import train_test_split
-import numpy as np
 
 
 def load_moons_data(n_samples=1000, noise=0.25, batch_size=64):

@@ -1,51 +1,54 @@
-# Moons Dataset: SGD vs SGLD Comparison
+# Moons Experiment: SGD vs. SGLD
 
-This experiment demonstrates the differences between Stochastic Gradient Descent (SGD) and Stochastic Gradient Langevin Dynamics (SGLD) on the challenging two moons classification problem.
+This project compares Stochastic Gradient Descent (SGD) and Stochastic Gradient Langevin Dynamics (SGLD) on the non-linear "two moons" dataset. The experiment is designed to show that **SGD is highly sensitive to its starting point**, often getting stuck in local minima, while SGLD's exploratory nature helps it find better solutions regardless of initialization.
 
-## Experiment Overview
+## The Setup
 
-**Problem**: Binary classification on two interleaving crescent-shaped clusters  
-**Model**: Simple MLP with 1 hidden layer (2→5→2, 37 parameters)  
-**Key Feature**: Both optimizers start with identical weights for fair comparison
+We deliberately create a difficult optimization problem to highlight the differences between the two methods.
 
-## Files
+  * **Model**: A narrow but deep MLP with ReLU activations.
+  * **Landscape**: Complex loss surface with many sharp local minima, creating a challenging optimization problem.
 
-- `experiment.py` - Main experiment script
-- `model.py` - Neural network architecture  
-- `moons_loader.py` - Dataset loading and preprocessing
-- `moons_comparison_final.png` - Results visualization
+## The Method
+  * **Sensitivity Test**: SGD's performance is often dictated by its random initialization. To demonstrate this, **SGD and SGLD start with the exact same initial weights** in each of our 10 experimental runs.
+  * **Hypothesis**: Because it only follows the gradient, SGD is expected to get trapped in the first poor minimum it finds. SGLD, using injected noise, is less sensitive to the starting conditions, allowing it to escape these traps and explore the landscape more broadly.
 
-## Key Settings
+## How to Run
 
-```python
-# Optimal hyperparameters discovered through experimentation
-NUM_EPOCHS = 2000
-LEARNING_RATE = 0.01
-SGLD_TEMPERATURE = 0.5
-SGLD_NOISE_DECAY = 0.9996  # Very slow decay for extended exploration
-BATCH_SIZE = 32
-```
+Create and activate virtual environment, install dependencies, and run
 
-## Expected Results
-
-- **SGD**: Stable training, may get stuck in local minima
-- **SGLD**: Initial exploration phase, then convergence to competitive performance
-- **Key Insight**: SGLD's exploration helps with non-linear decision boundaries
-
-## Running the Experiment
-
+**On macOS/Linux:**
 ```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 python experiment.py
 ```
 
-Results are saved as `moons_comparison_final.png` showing training/validation loss and accuracy curves for both optimizers.
+**On Windows:**
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+python experiment.py
+```
 
-## Architecture Details
+The script will run all 10 experiments and print a final summary of the average performance. It also generates two plots visualizing the results: one showing all individual runs and another showing the clean averages with confidence bands.
 
-**SimpleMLP**: 
-- Input: 2D coordinates (x1, x2)
-- Hidden: 5 neurons with ReLU activation  
-- Output: 2 classes (binary classification)
-- Total parameters: 37 (2×5 + 5 + 5×2 + 2)
+## Key Configuration
 
-**Why this is challenging**: With only 5 hidden neurons, the model must learn an efficient representation of the curved decision boundary between the two moons.
+```python
+NUM_EXPERIMENTS = 10
+NUM_EPOCHS = 1000
+LR = 0.01
+TEMPERATURE = 0.002
+TEMPERATURE_DECAY = 0.999
+```
+
+## Example Outputs
+
+![Individual Runs](moons_all_runs_10experiments.png)
+*Comparison of SGD vs SGLD across all 10 experimental runs*
+
+![Average Performance](moons_averages_10experiments.png) 
+*Average accuracy over epochs with confidence intervals*

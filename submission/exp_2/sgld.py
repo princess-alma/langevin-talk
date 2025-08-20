@@ -17,8 +17,6 @@ Where:
 import math
 import torch
 from torch.optim.optimizer import Optimizer
-from typing import Any, Dict, Optional
-
 
 class SGLD(Optimizer):
     """
@@ -120,7 +118,7 @@ class SGLD(Optimizer):
         self.current_epoch = epoch
     
     def get_current_temperature(self):
-        """Get the current effective temperature."""
+        """Get the current temperature."""
         temperature_decay = self.param_groups[0]['temperature_decay']
         return self.initial_temperature * (temperature_decay ** self.current_epoch)
     

@@ -2,11 +2,8 @@
 Moons Experiment: SGD vs SGLD
 
 Clean experiment comparing SGD vs SGLD on the two moons dataset.
-This demonstrates SGLD's exploration advantages on non-linear decision boundaries.
+This demonstrates SGLD's exploration advantages on complex loss landscapes.
 """
-
-import sys
-sys.path.append('..')  # To access shared sgld.py
 
 import torch
 import torch.nn as nn
@@ -14,10 +11,19 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from model import get_moons_model  # Model architecture
+from model import get_moons_model
 from sgld import SGLD
 from moons_loader import load_moons_data
 import random
+
+# Experimental Configuration
+NUM_EXPERIMENTS = 10
+BATCH_SIZE = 16
+NUM_EPOCHS = 1000
+LR = 0.01
+TEMPERATURE = 0.002
+TEMPERATURE_DECAY = 0.999
+DEVICE = torch.device('cpu')
 
 
 def train_model(model, train_loader, val_loader, optimizer, num_epochs, device, optimizer_name):
@@ -148,54 +154,6 @@ def get_shared_weights():
     return model.state_dict()
 
 
-def plot_comparison(sgd_history, sgld_history):
-    """Plot training comparison with all metrics (single run)."""
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))
-    
-    epochs = range(1, len(sgd_history['train_loss']) + 1)
-    
-    # Training Loss
-    ax1.plot(epochs, sgd_history['train_loss'], 'b-', label='SGD', linewidth=2)
-    ax1.plot(epochs, sgld_history['train_loss'], 'r-', label='SGLD', linewidth=2)
-    ax1.set_title('Training Loss', fontsize=14, fontweight='bold')
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-    
-    # Validation Loss
-    ax2.plot(epochs, sgd_history['val_loss'], 'b-', label='SGD', linewidth=2)
-    ax2.plot(epochs, sgld_history['val_loss'], 'r-', label='SGLD', linewidth=2)
-    ax2.set_title('Validation Loss', fontsize=14, fontweight='bold')
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Loss')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    
-    # Training Accuracy
-    ax3.plot(epochs, sgd_history['train_acc'], 'b-', label='SGD', linewidth=2)
-    ax3.plot(epochs, sgld_history['train_acc'], 'r-', label='SGLD', linewidth=2)
-    ax3.set_title('Training Accuracy', fontsize=14, fontweight='bold')
-    ax3.set_xlabel('Epoch')
-    ax3.set_ylabel('Accuracy (%)')
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-    
-    # Validation Accuracy
-    ax4.plot(epochs, sgd_history['val_acc'], 'b-', label='SGD', linewidth=2)
-    ax4.plot(epochs, sgld_history['val_acc'], 'r-', label='SGLD', linewidth=2)
-    ax4.set_title('Validation Accuracy', fontsize=14, fontweight='bold')
-    ax4.set_xlabel('Epoch')
-    ax4.set_ylabel('Accuracy (%)')
-    ax4.legend()
-    ax4.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig('moons_comparison_single.png', dpi=150, bbox_inches='tight')
-    print("📊 Single run plot saved as 'moons_comparison_single.png'")
-    plt.show()
-
-
 def evaluate_ensemble(saved_models, test_loader, device):
     """Evaluate ensemble performance by averaging predictions from saved checkpoints."""
     ensemble_correct = 0
@@ -235,14 +193,6 @@ def run_experiment():
     """Run the complete moons experiment with ensemble evaluation."""
     print("Moons Dataset Experiment: SGD vs SGLD with Ensemble Evaluation")
     print("=" * 64)
-    
-    # Optimal configuration based on our experiments
-    BATCH_SIZE = 16
-    NUM_EPOCHS = 1000  # Extended training for clear differences
-    LR = 0.01  # Higher LR works well for small networks
-    TEMPERATURE = 0.002  # Moderate initial temperature
-    TEMPERATURE_DECAY = 0.999  # Much slower decay to maintain exploration
-    DEVICE = torch.device('cpu')
     
     print(f"Device: {DEVICE}")
     print(f"Batch size: {BATCH_SIZE}")
@@ -309,13 +259,6 @@ def run_experiment():
     print(f"SGLD: Individual {sgld_test_acc:.1f}% → Ensemble {sgld_ensemble_acc:.1f}% (Δ{sgld_ensemble_acc - sgld_test_acc:+.1f}%)")
     print(f"Training Times: SGD {sgd_time:.1f}s, SGLD {sgld_time:.1f}s")
     
-    if sgld_ensemble_acc > sgd_ensemble_acc:
-        print(f"\n🏆 SGLD ensemble wins by {sgld_ensemble_acc - sgd_ensemble_acc:.1f}%!")
-    elif sgd_ensemble_acc > sgld_ensemble_acc:
-        print(f"\n🏆 SGD ensemble wins by {sgd_ensemble_acc - sgld_ensemble_acc:.1f}%!")
-    else:
-        print("\n🤝 Ensemble tie!")
-    
     return {
         'sgd_history': sgd_history,
         'sgld_history': sgld_history,
@@ -330,25 +273,50 @@ def run_experiment():
     }
 
 
+def setup_ax(ax, title, xlabel='Epoch', ylabel='Value'):
+    """Helper to format a subplot (without legend)."""
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.grid(True, alpha=0.3)
+
+
 def plot_multiple_experiments(all_results, num_experiments):
-    """Plot learning curves from multiple experiment runs on the same graph."""
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    """Plot learning curves from multiple experiment runs - create two plots: all runs + averages only."""
+    
+    # Plot 1: All individual runs with averages
+    fig1, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
     
     colors_sgd = plt.cm.Blues(np.linspace(0.4, 0.8, num_experiments))
     colors_sgld = plt.cm.Reds(np.linspace(0.4, 0.8, num_experiments))
     
+    # Plot individual runs
     for i, result in enumerate(all_results):
         sgd_history = result['sgd_history']
         sgld_history = result['sgld_history']
         epochs = range(1, len(sgd_history['train_loss']) + 1)
         
-        alpha = 0.7 if num_experiments > 1 else 1.0
+        alpha = 0.6 if num_experiments > 1 else 1.0
+        label_sgd = 'SGD Individual Runs' if i == 0 else None
+        label_sgld = 'SGLD Individual Runs' if i == 0 else None
         
         # Training Loss
         ax1.plot(epochs, sgd_history['train_loss'], color=colors_sgd[i], 
-                alpha=alpha, linewidth=1.5, label=f'SGD Run {i+1}' if i == 0 else None)
+                alpha=alpha, linewidth=1.2, label=label_sgd)
         ax1.plot(epochs, sgld_history['train_loss'], color=colors_sgld[i], 
-                alpha=alpha, linewidth=1.5, label=f'SGLD Run {i+1}' if i == 0 else None)
+                alpha=alpha, linewidth=1.2, label=label_sgld)
+        
+        # Validation Loss
+        ax2.plot(epochs, sgd_history['val_loss'], color=colors_sgd[i], alpha=alpha, linewidth=1.2)
+        ax2.plot(epochs, sgld_history['val_loss'], color=colors_sgld[i], alpha=alpha, linewidth=1.2)
+        
+        # Training Accuracy
+        ax3.plot(epochs, sgd_history['train_acc'], color=colors_sgd[i], alpha=alpha, linewidth=1.2)
+        ax3.plot(epochs, sgld_history['train_acc'], color=colors_sgld[i], alpha=alpha, linewidth=1.2)
+        
+        # Validation Accuracy
+        ax4.plot(epochs, sgd_history['val_acc'], color=colors_sgd[i], alpha=alpha, linewidth=1.2)
+        ax4.plot(epochs, sgld_history['val_acc'], color=colors_sgld[i], alpha=alpha, linewidth=1.2)
     
     # Add average lines if multiple runs
     if num_experiments > 1:
@@ -376,73 +344,98 @@ def plot_multiple_experiments(all_results, num_experiments):
         
         ax4.plot(epochs, avg_sgd_val_acc, 'b-', linewidth=3, label='SGD Average')
         ax4.plot(epochs, avg_sgld_val_acc, 'r-', linewidth=3, label='SGLD Average')
-        
-        # Plot individual runs for other metrics
-        for i, result in enumerate(all_results):
-            sgd_history = result['sgd_history']
-            sgld_history = result['sgld_history']
-            epochs = range(1, len(sgd_history['train_loss']) + 1)
-            
-            # Validation Loss
-            ax2.plot(epochs, sgd_history['val_loss'], color=colors_sgd[i], alpha=alpha, linewidth=1.5)
-            ax2.plot(epochs, sgld_history['val_loss'], color=colors_sgld[i], alpha=alpha, linewidth=1.5)
-            
-            # Training Accuracy
-            ax3.plot(epochs, sgd_history['train_acc'], color=colors_sgd[i], alpha=alpha, linewidth=1.5)
-            ax3.plot(epochs, sgld_history['train_acc'], color=colors_sgld[i], alpha=alpha, linewidth=1.5)
-            
-            # Validation Accuracy
-            ax4.plot(epochs, sgd_history['val_acc'], color=colors_sgd[i], alpha=alpha, linewidth=1.5)
-            ax4.plot(epochs, sgld_history['val_acc'], color=colors_sgld[i], alpha=alpha, linewidth=1.5)
-    else:
-        # Single run - plot all metrics
-        result = all_results[0]
-        sgd_history = result['sgd_history']
-        sgld_history = result['sgld_history']
-        epochs = range(1, len(sgd_history['train_loss']) + 1)
-        
-        # Validation Loss
-        ax2.plot(epochs, sgd_history['val_loss'], 'b-', label='SGD', linewidth=2)
-        ax2.plot(epochs, sgld_history['val_loss'], 'r-', label='SGLD', linewidth=2)
-        
-        # Training Accuracy
-        ax3.plot(epochs, sgd_history['train_acc'], 'b-', label='SGD', linewidth=2)
-        ax3.plot(epochs, sgld_history['train_acc'], 'r-', label='SGLD', linewidth=2)
-        
-        # Validation Accuracy
-        ax4.plot(epochs, sgd_history['val_acc'], 'b-', label='SGD', linewidth=2)
-        ax4.plot(epochs, sgld_history['val_acc'], 'r-', label='SGLD', linewidth=2)
     
-    # Formatting
-    ax1.set_title(f'Training Loss ({num_experiments} runs)', fontsize=14, fontweight='bold')
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+    # Formatting for Plot 1
+    setup_ax(ax1, f'Training Loss - All Runs ({num_experiments} experiments)', ylabel='Loss')
+    setup_ax(ax2, f'Validation Loss - All Runs ({num_experiments} experiments)', ylabel='Loss')
+    setup_ax(ax3, f'Training Accuracy - All Runs ({num_experiments} experiments)', ylabel='Accuracy (%)')
+    setup_ax(ax4, f'Validation Accuracy - All Runs ({num_experiments} experiments)', ylabel='Accuracy (%)')
     
-    ax2.set_title(f'Validation Loss ({num_experiments} runs)', fontsize=14, fontweight='bold')
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Loss')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    
-    ax3.set_title(f'Training Accuracy ({num_experiments} runs)', fontsize=14, fontweight='bold')
-    ax3.set_xlabel('Epoch')
-    ax3.set_ylabel('Accuracy (%)')
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-    
-    ax4.set_title(f'Validation Accuracy ({num_experiments} runs)', fontsize=14, fontweight='bold')
-    ax4.set_xlabel('Epoch')
-    ax4.set_ylabel('Accuracy (%)')
-    ax4.legend()
-    ax4.grid(True, alpha=0.3)
+    # Add a single shared legend at the top of the figure
+    handles, labels = ax1.get_legend_handles_labels()
+    fig1.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95), ncol=4, fontsize=12)
     
     plt.tight_layout()
-    filename = f'moons_comparison_{num_experiments}runs.png'
-    plt.savefig(filename, dpi=150, bbox_inches='tight')
-    print(f"📊 Multi-run plot saved as '{filename}'")
+    plt.subplots_adjust(top=0.88)  # Make room for the legend
+    filename1 = f'moons_all_runs_{num_experiments}experiments.png'
+    plt.savefig(filename1, dpi=150, bbox_inches='tight')
+    print(f"📊 All runs plot saved as '{filename1}'")
     plt.show()
+    
+    # Plot 2: Averages only (clean view)
+    if num_experiments > 1:
+        fig2, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+        
+        epochs = range(1, len(avg_sgd_train_loss) + 1)
+        
+        # Plot only averages with confidence intervals/standard deviation
+        sgd_train_loss_std = np.std([r['sgd_history']['train_loss'] for r in all_results], axis=0)
+        sgld_train_loss_std = np.std([r['sgld_history']['train_loss'] for r in all_results], axis=0)
+        sgd_val_loss_std = np.std([r['sgd_history']['val_loss'] for r in all_results], axis=0)
+        sgld_val_loss_std = np.std([r['sgld_history']['val_loss'] for r in all_results], axis=0)
+        sgd_train_acc_std = np.std([r['sgd_history']['train_acc'] for r in all_results], axis=0)
+        sgld_train_acc_std = np.std([r['sgld_history']['train_acc'] for r in all_results], axis=0)
+        sgd_val_acc_std = np.std([r['sgd_history']['val_acc'] for r in all_results], axis=0)
+        sgld_val_acc_std = np.std([r['sgld_history']['val_acc'] for r in all_results], axis=0)
+        
+        # Training Loss with confidence bands (capped at 0)
+        ax1.plot(epochs, avg_sgd_train_loss, 'b-', linewidth=3, label='SGD')
+        ax1.fill_between(epochs, 
+                         np.maximum(0, avg_sgd_train_loss - sgd_train_loss_std), 
+                         avg_sgd_train_loss + sgd_train_loss_std, alpha=0.2, color='blue')
+        ax1.plot(epochs, avg_sgld_train_loss, 'r-', linewidth=3, label='SGLD')
+        ax1.fill_between(epochs, 
+                         np.maximum(0, avg_sgld_train_loss - sgld_train_loss_std), 
+                         avg_sgld_train_loss + sgld_train_loss_std, alpha=0.2, color='red')
+        
+        # Validation Loss with confidence bands (capped at 0)
+        ax2.plot(epochs, avg_sgd_val_loss, 'b-', linewidth=3, label='SGD')
+        ax2.fill_between(epochs, 
+                         np.maximum(0, avg_sgd_val_loss - sgd_val_loss_std), 
+                         avg_sgd_val_loss + sgd_val_loss_std, alpha=0.2, color='blue')
+        ax2.plot(epochs, avg_sgld_val_loss, 'r-', linewidth=3, label='SGLD')
+        ax2.fill_between(epochs, 
+                         np.maximum(0, avg_sgld_val_loss - sgld_val_loss_std), 
+                         avg_sgld_val_loss + sgld_val_loss_std, alpha=0.2, color='red')
+        
+        # Training Accuracy with confidence bands (capped at 0% and 100%)
+        ax3.plot(epochs, avg_sgd_train_acc, 'b-', linewidth=3, label='SGD')
+        ax3.fill_between(epochs, 
+                         np.maximum(0, avg_sgd_train_acc - sgd_train_acc_std), 
+                         np.minimum(100, avg_sgd_train_acc + sgd_train_acc_std), alpha=0.2, color='blue')
+        ax3.plot(epochs, avg_sgld_train_acc, 'r-', linewidth=3, label='SGLD')
+        ax3.fill_between(epochs, 
+                         np.maximum(0, avg_sgld_train_acc - sgld_train_acc_std), 
+                         np.minimum(100, avg_sgld_train_acc + sgld_train_acc_std), alpha=0.2, color='red')
+        
+        # Validation Accuracy with confidence bands (capped at 0% and 100%)
+        ax4.plot(epochs, avg_sgd_val_acc, 'b-', linewidth=3, label='SGD')
+        ax4.fill_between(epochs, 
+                         np.maximum(0, avg_sgd_val_acc - sgd_val_acc_std), 
+                         np.minimum(100, avg_sgd_val_acc + sgd_val_acc_std), alpha=0.2, color='blue')
+        ax4.plot(epochs, avg_sgld_val_acc, 'r-', linewidth=3, label='SGLD')
+        ax4.fill_between(epochs, 
+                         np.maximum(0, avg_sgld_val_acc - sgld_val_acc_std), 
+                         np.minimum(100, avg_sgld_val_acc + sgld_val_acc_std), alpha=0.2, color='red')
+        
+        # Formatting for Plot 2
+        setup_ax(ax1, f'Training Loss - Averages ({num_experiments} experiments)', ylabel='Loss')
+        setup_ax(ax2, f'Validation Loss - Averages ({num_experiments} experiments)', ylabel='Loss')
+        setup_ax(ax3, f'Training Accuracy - Averages ({num_experiments} experiments)', ylabel='Accuracy (%)')
+        setup_ax(ax4, f'Validation Accuracy - Averages ({num_experiments} experiments)', ylabel='Accuracy (%)')
+        
+        # Add a single shared legend at the top of the figure
+        handles, labels = ax1.get_legend_handles_labels()
+        fig2.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95), ncol=2, fontsize=12)
+        
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.88)  # Make room for the legend
+        filename2 = f'moons_averages_{num_experiments}experiments.png'
+        plt.savefig(filename2, dpi=150, bbox_inches='tight')
+        print(f"📊 Averages plot saved as '{filename2}'")
+        plt.show()
+    else:
+        print("📊 Single experiment - only one plot generated")
 
 
 def print_summary_statistics(all_results, num_experiments):
@@ -475,32 +468,31 @@ def print_summary_statistics(all_results, num_experiments):
     print(f"SGD Training Time:  {np.mean(sgd_times):.1f}s ± {np.std(sgd_times):.1f}s")
     print(f"SGLD Training Time: {np.mean(sgld_times):.1f}s ± {np.std(sgld_times):.1f}s")
     
-    # Statistical significance tests (if multiple runs)
+    # Overall winner announcement (if multiple runs)
     if num_experiments > 1:
-        from scipy import stats
-        
-        print("\nStatistical Tests (p-values):")
-        # Individual model comparison
-        _, p_individual = stats.ttest_rel(sgld_test_accs, sgd_test_accs)
-        print(f"Individual Models (SGLD vs SGD): p = {p_individual:.4f}")
-        
-        # Ensemble comparison
-        _, p_ensemble = stats.ttest_rel(sgld_ensemble_accs, sgd_ensemble_accs)
-        print(f"Ensemble Models (SGLD vs SGD): p = {p_ensemble:.4f}")
-        
-        # Performance improvements
+        # Calculate performance improvements for winner determination
         individual_improvements = [sgld - sgd for sgld, sgd in zip(sgld_test_accs, sgd_test_accs)]
         ensemble_improvements = [sgld - sgd for sgld, sgd in zip(sgld_ensemble_accs, sgd_ensemble_accs)]
         
-        print(f"\nPerformance Improvements (SGLD - SGD):")
-        print(f"Individual: {np.mean(individual_improvements):.1f}% ± {np.std(individual_improvements):.1f}%")
-        print(f"Ensemble: {np.mean(ensemble_improvements):.1f}% ± {np.std(ensemble_improvements):.1f}%")
+        avg_ensemble_improvement = np.mean(ensemble_improvements)
+        if avg_ensemble_improvement > 0.5:  # More than 0.5% improvement
+            print(f"\n🏆 SGLD ensemble wins overall by {avg_ensemble_improvement:.1f}%!")
+        elif avg_ensemble_improvement < -0.5:  # More than 0.5% worse
+            print(f"\n🏆 SGD ensemble wins overall by {-avg_ensemble_improvement:.1f}%!")
+        else:
+            print(f"\n🤝 Overall ensemble performance is essentially tied!")
+    else:
+        # Single experiment case
+        result = all_results[0]
+        if result['sgld_ensemble_acc'] > result['sgd_ensemble_acc'] + 0.5:
+            print(f"\n🏆 SGLD ensemble wins by {result['sgld_ensemble_acc'] - result['sgd_ensemble_acc']:.1f}%!")
+        elif result['sgd_ensemble_acc'] > result['sgld_ensemble_acc'] + 0.5:
+            print(f"\n🏆 SGD ensemble wins by {result['sgd_ensemble_acc'] - result['sgld_ensemble_acc']:.1f}%!")
+        else:
+            print(f"\n🤝 Ensemble performance is essentially tied!")
 
 
-if __name__ == "__main__":
-    # Configuration for multiple runs
-    NUM_EXPERIMENTS = 10  # Number of experiments to run (reduced for testing)
-    
+if __name__ == "__main__":    
     print(f"Running {NUM_EXPERIMENTS} independent experiments...")
     print("=" * 60)
     

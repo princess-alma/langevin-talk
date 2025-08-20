@@ -3,7 +3,6 @@ Simple MLP for moons classification experiment. The network uses ReLU, it has a 
 structure to deliberately create a challenging loss landscape.
 """
 
-import torch
 import torch.nn as nn
 
 
