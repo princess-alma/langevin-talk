@@ -287,7 +287,6 @@ def run_experiment():
         model_sgld.parameters(), 
         lr=LR, 
         temperature=TEMPERATURE,
-        lr_decay=0.001,
         noise_decay=NOISE_DECAY
     )
     
@@ -495,7 +494,6 @@ def run_single_experiment_quiet():
         model_sgld.parameters(), 
         lr=LR, 
         temperature=TEMPERATURE,
-        lr_decay=0.001,
         noise_decay=NOISE_DECAY
     )
     
@@ -602,5 +600,5 @@ def train_model_quiet(model, train_loader, val_loader, optimizer, num_epochs, de
 
 
 if __name__ == "__main__":
-    # Run 100 trials to see which wins more frequently
-    results = run_multiple_experiments(n_trials=100)
+    # Run a single SGD vs SGLD comparison
+    results = run_experiment()
