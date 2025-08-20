@@ -34,8 +34,6 @@ class SGLD(Optimizer):
         params (iterable): iterable of parameters to optimize or dicts defining parameter groups
         lr (float, optional): learning rate / step size (default: 1e-2)
         temperature (float, optional): temperature parameter controlling noise level (default: 1.0)
-        momentum (float, optional): momentum factor (0 = no momentum) (default: 0.0)
-        weight_decay (float, optional): weight decay (L2 penalty) (default: 0.0)
         temperature_decay (float, optional): decay factor for temperature over time (default: 1.0)
         
     Note:
@@ -57,27 +55,27 @@ class SGLD(Optimizer):
             raise ValueError(f"Invalid learning rate: {lr}")
         if not 0.0 <= temperature:
             raise ValueError(f"Invalid temperature: {temperature}")
-        if not 0.0 <= momentum < 1.0:
-            raise ValueError(f"Invalid momentum value: {momentum}")
-        if not 0.0 <= weight_decay:
-            raise ValueError(f"Invalid weight_decay value: {weight_decay}")
         if not 0.0 <= temperature_decay <= 1.0:
             raise ValueError(f"Invalid temperature_decay value: {temperature_decay}")
 
         defaults = dict(
             lr=lr, 
             temperature=temperature,
-            momentum=momentum,
-            weight_decay=weight_decay,
             temperature_decay=temperature_decay
         )
         super(SGLD, self).__init__(params, defaults)
         
-        # Initialize global step counter
-        self.state['global_step'] = 0
+        # Use instance attributes for better clarity
+        self.current_epoch = 0
+        self.initial_temperature = temperature
 
     def __setstate__(self, state):
         super(SGLD, self).__setstate__(state)
+        # Ensure new attributes are present for backwards compatibility
+        if not hasattr(self, 'current_epoch'):
+            self.current_epoch = 0
+        if not hasattr(self, 'initial_temperature'):
+            self.initial_temperature = self.param_groups[0]['temperature']
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -93,42 +91,17 @@ class SGLD(Optimizer):
             with torch.enable_grad():
                 loss = closure()
 
-        # Increment global step counter
-        self.state['global_step'] += 1
-        global_step = self.state['global_step']
-
         for group in self.param_groups:
-            weight_decay = group['weight_decay']
-            momentum = group['momentum']
-            temperature = group['temperature']
             temperature_decay = group['temperature_decay']
-            current_lr = group['lr']  # Use constant learning rate
+            current_lr = group['lr']
             
-            # Apply temperature decay over time
-            current_temperature = temperature * (temperature_decay ** global_step)
+            current_temperature = self.initial_temperature * (temperature_decay ** self.current_epoch)
 
             for p in group['params']:
                 if p.grad is None:
                     continue
                     
                 grad = p.grad
-                
-                # Apply weight decay (modifies gradient in-place)
-                if weight_decay != 0:
-                    grad = grad.add(p, alpha=weight_decay)
-
-                param_state = self.state[p]
-
-                # State initialization
-                if len(param_state) == 0:
-                    param_state['momentum_buffer'] = torch.zeros_like(p)
-
-                buf = param_state['momentum_buffer']
-
-                # Apply momentum (if specified)
-                if momentum != 0:
-                    buf.mul_(momentum).add_(grad)
-                    grad = buf
 
                 # Generate Langevin noise: √(2 * lr * temperature) * N(0, I)
                 if current_temperature > 0:
@@ -141,3 +114,16 @@ class SGLD(Optimizer):
                 p.add_(grad, alpha=-current_lr).add_(noise)
 
         return loss
+
+    def set_epoch(self, epoch):
+        """Set the current epoch for temperature decay calculation."""
+        self.current_epoch = epoch
+    
+    def get_current_temperature(self):
+        """Get the current effective temperature."""
+        temperature_decay = self.param_groups[0]['temperature_decay']
+        return self.initial_temperature * (temperature_decay ** self.current_epoch)
+    
+    def get_current_lr(self):
+        """Get the current learning rate."""
+        return self.param_groups[0]['lr']

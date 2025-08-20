@@ -1,5 +1,6 @@
 """
-Simple MLP for moons classification experiment.
+Simple MLP for moons classification experiment. The network uses ReLU, it has a deep and narrow
+structure to deliberately create a challenging loss landscape.
 """
 
 import torch
@@ -25,6 +26,8 @@ class SimpleMLP(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
             nn.Linear(hidden_size, num_classes)
         )
         
@@ -32,6 +35,10 @@ class SimpleMLP(nn.Module):
         return self.net(x)
 
 
-def get_moons_model():
-    """Get the model for moons classification - small and challenging."""
-    return SimpleMLP(input_size=2, hidden_size=3, num_classes=2)
+def get_moons_model(hidden_size=3):
+    """Get the model for moons classification - small and challenging.
+    
+    Args:
+        hidden_size (int): Size of hidden layers (default: 3 for challenging learning)
+    """
+    return SimpleMLP(input_size=2, hidden_size=hidden_size, num_classes=2)
