@@ -250,7 +250,7 @@ def run_experiment():
     NUM_EPOCHS = 1500  # Extended training for clear differences
     LR = 0.01  # Higher LR works well for small networks
     TEMPERATURE = 0.05  # Moderate initial temperature
-    NOISE_DECAY = 0.9996  # Much slower decay to maintain exploration
+    TEMPERATURE_DECAY = 0.9996  # Much slower decay to maintain exploration
     DEVICE = torch.device('cpu')
     
     print(f"Device: {DEVICE}")
@@ -258,7 +258,7 @@ def run_experiment():
     print(f"Epochs: {NUM_EPOCHS}")
     print(f"Learning rate: {LR}")
     print(f"SGLD Temperature: {TEMPERATURE}")
-    print(f"SGLD Noise Decay: {NOISE_DECAY}")
+    print(f"SGLD Temperature Decay: {TEMPERATURE_DECAY}")
     print()
     
     # Load data
@@ -287,7 +287,7 @@ def run_experiment():
         model_sgld.parameters(), 
         lr=LR, 
         temperature=TEMPERATURE,
-        noise_decay=NOISE_DECAY
+        temperature_decay=TEMPERATURE_DECAY
     )
     
     sgld_history, sgld_time, sgld_models = train_model(
@@ -467,7 +467,7 @@ def run_single_experiment_quiet():
     NUM_EPOCHS = 1500
     LR = 0.01
     TEMPERATURE = 0.01
-    NOISE_DECAY = 0.9996
+    TEMPERATURE_DECAY = 0.9996
     DEVICE = torch.device('cpu')
     
     # Load data
@@ -494,7 +494,7 @@ def run_single_experiment_quiet():
         model_sgld.parameters(), 
         lr=LR, 
         temperature=TEMPERATURE,
-        noise_decay=NOISE_DECAY
+        temperature_decay=TEMPERATURE_DECAY
     )
     
     sgld_history, sgld_time, sgld_models = train_model_quiet(

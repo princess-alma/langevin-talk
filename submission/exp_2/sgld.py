@@ -36,10 +36,12 @@ class SGLD(Optimizer):
         temperature (float, optional): temperature parameter controlling noise level (default: 1.0)
         momentum (float, optional): momentum factor (0 = no momentum) (default: 0.0)
         weight_decay (float, optional): weight decay (L2 penalty) (default: 0.0)
-        noise_decay (float, optional): decay factor for noise over time (default: 1.0)
+        temperature_decay (float, optional): decay factor for temperature over time (default: 1.0)
         
     Note:
-        - For convergence to the true posterior, use appropriate constant step size
+        - This implementation uses a constant learning rate and a decaying temperature
+          (annealing), which transitions the optimizer from an exploration phase to a
+          posterior sampling phase.
         - Set temperature=0 to recover standard SGD behavior
     """
     
@@ -49,7 +51,7 @@ class SGLD(Optimizer):
                  temperature: float = 1.0,
                  momentum: float = 0.0,
                  weight_decay: float = 0.0,
-                 noise_decay: float = 1.0):
+                 temperature_decay: float = 1.0):
         
         if not 0.0 <= lr:
             raise ValueError(f"Invalid learning rate: {lr}")
@@ -59,15 +61,15 @@ class SGLD(Optimizer):
             raise ValueError(f"Invalid momentum value: {momentum}")
         if not 0.0 <= weight_decay:
             raise ValueError(f"Invalid weight_decay value: {weight_decay}")
-        if not 0.0 <= noise_decay <= 1.0:
-            raise ValueError(f"Invalid noise_decay value: {noise_decay}")
+        if not 0.0 <= temperature_decay <= 1.0:
+            raise ValueError(f"Invalid temperature_decay value: {temperature_decay}")
 
         defaults = dict(
             lr=lr, 
             temperature=temperature,
             momentum=momentum,
             weight_decay=weight_decay,
-            noise_decay=noise_decay
+            temperature_decay=temperature_decay
         )
         super(SGLD, self).__init__(params, defaults)
         
@@ -99,11 +101,11 @@ class SGLD(Optimizer):
             weight_decay = group['weight_decay']
             momentum = group['momentum']
             temperature = group['temperature']
-            noise_decay = group['noise_decay']
+            temperature_decay = group['temperature_decay']
             current_lr = group['lr']  # Use constant learning rate
             
-            # Apply noise decay over time
-            current_temperature = temperature * (noise_decay ** global_step)
+            # Apply temperature decay over time
+            current_temperature = temperature * (temperature_decay ** global_step)
 
             for p in group['params']:
                 if p.grad is None:
@@ -111,7 +113,7 @@ class SGLD(Optimizer):
                     
                 grad = p.grad
                 
-                # Apply weight decay
+                # Apply weight decay (modifies gradient in-place)
                 if weight_decay != 0:
                     grad = grad.add(p, alpha=weight_decay)
 
