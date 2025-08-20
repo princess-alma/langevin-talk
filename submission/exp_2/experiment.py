@@ -96,8 +96,8 @@ def train_model(model, train_loader, val_loader, optimizer, num_epochs, device, 
             else:
                 print(f'{optimizer_name} Epoch {epoch+1}: Train Acc: {train_acc:.1f}%, Val Acc: {val_acc:.1f}%')
         
-        # Save best models for ensembling (after epoch 500)
-        if epoch + 1 >= 500:
+        # Save model checkpoints every 100 epochs after epoch 500 (not based on best val loss)
+        if epoch + 1 >= 500 and (epoch + 1) % 100 == 0:
             checkpoint = {
                 'epoch': epoch + 1,
                 'state_dict': {k: v.clone().cpu() for k, v in model.state_dict().items()},
@@ -106,26 +106,19 @@ def train_model(model, train_loader, val_loader, optimizer, num_epochs, device, 
                 'val_loss': val_loss / len(val_loader)
             }
             
-            # Add to saved models and keep only top 5 by validation loss (lower is better)
+            # Add to saved models - save every 100 epochs, not based on performance
             saved_models.append(checkpoint)
-            saved_models.sort(key=lambda x: x['val_loss'])  # Sort by loss, ascending (lower is better)
             
-            if len(saved_models) > 5:
-                saved_models = saved_models[:5]
-                
-            # Print when we save a new best model or update the top 5
-            if len(saved_models) <= 5 and (epoch + 1) % 100 == 0:
-                max_val_loss = max(m['val_loss'] for m in saved_models) if saved_models else 0
-                print(f'  💾 Top 5 models: {len(saved_models)}/5, max val_loss: {max_val_loss:.4f}')
+            print(f'  💾 Saved checkpoint at epoch {epoch + 1}: Train Acc: {train_acc:.1f}%, Val Acc: {val_acc:.1f}%, Val Loss: {val_loss / len(val_loader):.4f}')
     
     training_time = time.time() - start_time
     print(f'{optimizer_name} Training Time: {training_time:.1f}s')
     
     if saved_models:
-        best_val_loss = min(m['val_loss'] for m in saved_models)  # Lower loss is better
-        worst_val_loss = max(m['val_loss'] for m in saved_models)
+        latest_epoch = max(m['epoch'] for m in saved_models)
+        earliest_epoch = min(m['epoch'] for m in saved_models)
         avg_val_loss = sum(m['val_loss'] for m in saved_models) / len(saved_models)
-        print(f'{optimizer_name} Saved {len(saved_models)} best models (val loss: {best_val_loss:.4f}-{worst_val_loss:.4f}, avg: {avg_val_loss:.4f})')
+        print(f'{optimizer_name} Saved {len(saved_models)} checkpoint models (epochs {earliest_epoch}-{latest_epoch}, avg val loss: {avg_val_loss:.4f})')
     
     return history, training_time, saved_models
 
@@ -246,10 +239,10 @@ def run_experiment():
     print("=" * 64)
     
     # Optimal configuration based on our experiments
-    BATCH_SIZE = 32
-    NUM_EPOCHS = 1500  # Extended training for clear differences
+    BATCH_SIZE = 16
+    NUM_EPOCHS = 1000  # Extended training for clear differences
     LR = 0.01  # Higher LR works well for small networks
-    TEMPERATURE = 0.05  # Moderate initial temperature
+    TEMPERATURE = 0.002  # Moderate initial temperature
     TEMPERATURE_DECAY = 0.9996  # Much slower decay to maintain exploration
     DEVICE = torch.device('cpu')
     
@@ -300,7 +293,7 @@ def run_experiment():
     
     # Ensemble evaluation
     print("\n" + "="*60)
-    print("ENSEMBLE PERFORMANCE COMPARISON")
+    print("ENSEMBLE PERFORMANCE COMPARISON (Regular Checkpoints)")
     print("="*60)
     
     sgd_ensemble_acc = evaluate_ensemble(sgd_models, test_loader, DEVICE)

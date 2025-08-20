@@ -19,6 +19,12 @@ class SimpleMLP(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
             nn.Linear(hidden_size, num_classes)
         )
         
@@ -28,4 +34,4 @@ class SimpleMLP(nn.Module):
 
 def get_moons_model():
     """Get the model for moons classification - small and challenging."""
-    return SimpleMLP(input_size=2, hidden_size=2, num_classes=2)
+    return SimpleMLP(input_size=2, hidden_size=3, num_classes=2)

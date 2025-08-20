@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 
 
-def load_moons_data(n_samples=1000, noise=0.1, batch_size=64):
+def load_moons_data(n_samples=1000, noise=0.25, batch_size=64):
     """Generate and load moons dataset."""
     
     # Generate moons data
