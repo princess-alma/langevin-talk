@@ -45,8 +45,6 @@ class SGLD(Optimizer):
                  params, 
                  lr: float = 1e-2,
                  temperature: float = 1.0,
-                 momentum: float = 0.0,
-                 weight_decay: float = 0.0,
                  temperature_decay: float = 1.0):
         
         if not 0.0 <= lr:

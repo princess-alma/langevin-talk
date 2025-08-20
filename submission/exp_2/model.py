@@ -1,15 +1,13 @@
-"""
-Simple MLP for moons classification experiment. The network uses ReLU, it has a deep and narrow
-structure to deliberately create a challenging loss landscape.
-"""
-
 import torch.nn as nn
 
 
-class SimpleMLP(nn.Module):
-    """Simple MLP for 2D moons classification - challenging single hidden layer."""
-    
-    def __init__(self, input_size=2, hidden_size=5, num_classes=2):
+class SimpleMLP(nn.Module):    
+    """
+    Simple MLP for moons classification experiment. 
+    The network uses ReLU, it has a deep and narrow
+    structure to deliberately create a challenging loss landscape.
+    """
+    def __init__(self, input_size=2, hidden_size=3, num_classes=2):
         super().__init__()
         
         self.net = nn.Sequential(

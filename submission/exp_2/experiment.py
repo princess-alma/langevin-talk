@@ -362,7 +362,7 @@ def plot_multiple_experiments(all_results, num_experiments):
     print(f"📊 All runs plot saved as '{filename1}'")
     plt.show()
     
-    # Plot 2: Averages only (clean view)
+    # Plot 2: Averages only
     if num_experiments > 1:
         fig2, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
         
@@ -471,7 +471,6 @@ def print_summary_statistics(all_results, num_experiments):
     # Overall winner announcement (if multiple runs)
     if num_experiments > 1:
         # Calculate performance improvements for winner determination
-        individual_improvements = [sgld - sgd for sgld, sgd in zip(sgld_test_accs, sgd_test_accs)]
         ensemble_improvements = [sgld - sgd for sgld, sgd in zip(sgld_ensemble_accs, sgd_ensemble_accs)]
         
         avg_ensemble_improvement = np.mean(ensemble_improvements)
